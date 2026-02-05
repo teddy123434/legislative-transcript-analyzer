@@ -1,0 +1,8 @@
+output/*
+委員會/*
+逐字稿/*
+GH_Copilot
+__pycache__
+.vscode
+analyzer.py
+.DS_Store
