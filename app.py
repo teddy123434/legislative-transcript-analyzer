@@ -125,8 +125,15 @@ if label_file and uploaded_files:
         
         for i, uploaded_file in enumerate(uploaded_files):
             # 讀取並自動轉換文字內容（支援 txt/doc/docx 與多編碼）
-            file_bytes = uploaded_file.getvalue()
-            text, convert_note = extract_text_from_uploaded_file(uploaded_file.name, file_bytes)
+            try:
+                file_bytes = uploaded_file.getvalue()
+                text, convert_note = extract_text_from_uploaded_file(uploaded_file.name, file_bytes)
+            except ValueError as e:
+                st.error(f"❌ 檔案轉換失敗: {uploaded_file.name}\n\n{str(e)}")
+                st.stop()
+            except Exception as e:
+                st.error(f"❌ 處理檔案失敗: {uploaded_file.name}\n\n錯誤: {str(e)}")
+                st.stop()
             
             # 解析
             info, stats = parse_transcript(text, labels)

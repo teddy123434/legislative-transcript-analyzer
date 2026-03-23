@@ -17,7 +17,10 @@
 
 - **作業系統**：Windows / macOS / Linux
 - **Python 版本**：Python 3.8 以上
-- **Windows doc 轉檔需求**：若要自動轉換 `.doc`，建議安裝 Microsoft Word
+- **`.doc` 轉檔需求**（可選）
+  - **Windows**：建議安裝 Microsoft Word（若未安裝，請上傳 `.docx` 或 `.txt`）
+  - **macOS**：需安裝 LibreOffice（下方有安裝說明）
+  - **Linux**：需安裝 LibreOffice
 
 ---
 
@@ -40,6 +43,21 @@
    ```bash
    bash run.sh
    ```
+
+#### macOS 用戶特別說明：支援 `.doc` 轉檔
+
+如果您要上傳 `.doc` 檔案並自動轉換，需要先安裝 LibreOffice：
+
+**方式 1：使用 Homebrew（推薦，自動識別 Intel/Apple Silicon）**
+```bash
+brew install libreoffice
+```
+
+**方式 2：手動下載**
+- 前往 [LibreOffice 官網](https://www.libreoffice.org/download/) 下載 macOS 版本
+- 安裝後，程式會自動識別路徑
+
+若未安裝 LibreOffice，您仍可上傳 `.txt` 或 `.docx` 檔案正常使用。
 
 **三層自動降級機制**：
 - 優先嘗試啟動 Streamlit（最完整的功能）
@@ -138,9 +156,15 @@
 
 #### 2. 會議逐字稿檔案（txt / doc / docx）
 
-- 支援 `.txt`、`.docx`、`.doc`
-- `.docx` 會自動抽取純文字
-- `.doc` 會嘗試自動轉為 `.docx` 後再抽取純文字
+**支援的檔案格式：**
+- `.txt` - 純文字檔（推薦；編碼會自動偵測，包括 UTF-8、Big5、CP950 等）
+- `.docx` - Word 新版格式（自動抽取純文字）
+- `.doc` - Word 舊版格式（會嘗試自動轉為 `.docx` 後再抽取純文字）
+
+**`.doc` 轉換說明：**
+- **Windows**：需安裝 Microsoft Word；若未安裝，請改上傳 `.docx` 或 `.txt`
+- **macOS/Linux**：需先 `brew install libreoffice` 或系統套件管理器安裝 LibreOffice
+- 若轉換失敗，錯誤訊息會清楚提示如何安裝所需軟體
 - 支援立法院官方格式
 - 可同時上傳多份逐字稿
 

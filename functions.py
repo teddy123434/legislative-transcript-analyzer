@@ -59,14 +59,17 @@ def extract_text_from_docx_bytes(file_bytes):
 def convert_doc_to_docx_bytes(file_name, file_bytes):
     """
     自動將 .doc 轉成 .docx，優先使用：
-    1) Windows + Word COM
-    2) soffice (LibreOffice)
+    1) Windows + Word COM (win32com)
+    2) LibreOffice soffice (macOS/Linux/Windows)
+    
+    on macOS: 檢查常見路徑，包括 /Applications/LibreOffice.app
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         source_path = Path(temp_dir) / file_name
         target_path = source_path.with_suffix('.docx')
         source_path.write_bytes(file_bytes)
 
+        # 方案 1: Windows + Word COM
         if platform.system().lower() == 'windows':
             try:
                 import win32com.client
@@ -81,33 +84,62 @@ def convert_doc_to_docx_bytes(file_name, file_bytes):
             except Exception:
                 pass
 
-        soffice_path = shutil.which('soffice')
-        if soffice_path:
-            try:
-                subprocess.run(
-                    [
-                        soffice_path,
-                        '--headless',
-                        '--convert-to',
-                        'docx',
-                        '--outdir',
-                        temp_dir,
-                        str(source_path)
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                if target_path.exists():
-                    return target_path.read_bytes()
-            except Exception:
-                pass
+        # 方案 2: LibreOffice soffice (所有平台)
+        soffice_candidates = [
+            shutil.which('soffice'),  # PATH 中的 soffice
+            '/Applications/LibreOffice.app/Contents/MacOS/soffice',  # macOS 標準路徑
+            '/usr/bin/soffice',  # Linux 標準路徑
+            '/usr/local/bin/soffice',  # Homebrew (Intel Mac)
+            '/opt/homebrew/bin/soffice',  # Homebrew (Apple Silicon)
+        ]
+        
+        for soffice_path in soffice_candidates:
+            if soffice_path and Path(soffice_path).exists():
+                try:
+                    subprocess.run(
+                        [
+                            soffice_path,
+                            '--headless',
+                            '--convert-to',
+                            'docx',
+                            '--outdir',
+                            temp_dir,
+                            str(source_path)
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    if target_path.exists():
+                        return target_path.read_bytes()
+                except Exception:
+                    pass
 
-    raise ValueError(
-        "無法自動將 .doc 轉為 .docx。"
-        "Windows 請確認已安裝 Microsoft Word；"
-        "或改上傳 .docx / .txt。"
-    )
+    # 根據平台顯示不同的錯誤訊息
+    system = platform.system().lower()
+    if system == 'windows':
+        error_msg = (
+            "無法自動將 .doc 轉為 .docx。\n"
+            "Windows 請確認已安裝 Microsoft Word；或改上傳 .docx / .txt。"
+        )
+    elif system == 'darwin':  # macOS
+        error_msg = (
+            "無法自動將 .doc 轉為 .docx。\n"
+            "macOS 請安裝 LibreOffice：\n"
+            "  brew install libreoffice\n"
+            "或改上傳 .docx / .txt。"
+        )
+    else:  # Linux
+        error_msg = (
+            "無法自動將 .doc 轉為 .docx。\n"
+            "Linux 請安裝 LibreOffice：\n"
+            "  sudo apt install libreoffice (Debian/Ubuntu)\n"
+            "  sudo yum install libreoffice (CentOS/RHEL)\n"
+            "或改上傳 .docx / .txt。"
+        )
+    
+    raise ValueError(error_msg)
 
 
 def extract_text_from_uploaded_file(file_name, file_bytes):
