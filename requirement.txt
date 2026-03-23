@@ -3,3 +3,7 @@ pandas
 openpyxl
 numpy
 xlsxwriter
+python-docx
+charset-normalizer
+flask
+werkzeug

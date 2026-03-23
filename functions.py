@@ -1,8 +1,135 @@
 # 委員實質法案審查發言次/字數函式庫
 import re
+import io
+import platform
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+from charset_normalizer import from_bytes
+from docx import Document
 from config import user_config
 
 party_order, info_order, metric_order = user_config()
+
+
+def decode_text_bytes(file_bytes):
+    """
+    盡可能自動偵測文字編碼，提升 Windows 上的相容性。
+    """
+    if not file_bytes:
+        return ""
+
+    fallback_encodings = [
+        'utf-8-sig',
+        'utf-8',
+        'cp950',
+        'big5',
+        'utf-16',
+        'utf-16le',
+        'utf-16be',
+        'gb18030'
+    ]
+
+    best_match = from_bytes(file_bytes).best()
+    if best_match:
+        try:
+            return str(best_match)
+        except Exception:
+            pass
+
+    for encoding in fallback_encodings:
+        try:
+            return file_bytes.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return file_bytes.decode('utf-8', errors='replace')
+
+
+def extract_text_from_docx_bytes(file_bytes):
+    """
+    將 docx 內容擷取成純文字。
+    """
+    document = Document(io.BytesIO(file_bytes))
+    return "\n".join(paragraph.text for paragraph in document.paragraphs)
+
+
+def convert_doc_to_docx_bytes(file_name, file_bytes):
+    """
+    自動將 .doc 轉成 .docx，優先使用：
+    1) Windows + Word COM
+    2) soffice (LibreOffice)
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        source_path = Path(temp_dir) / file_name
+        target_path = source_path.with_suffix('.docx')
+        source_path.write_bytes(file_bytes)
+
+        if platform.system().lower() == 'windows':
+            try:
+                import win32com.client
+
+                word_app = win32com.client.Dispatch('Word.Application')
+                word_app.Visible = False
+                document = word_app.Documents.Open(str(source_path.resolve()))
+                document.SaveAs(str(target_path.resolve()), FileFormat=16)
+                document.Close(False)
+                word_app.Quit()
+                return target_path.read_bytes()
+            except Exception:
+                pass
+
+        soffice_path = shutil.which('soffice')
+        if soffice_path:
+            try:
+                subprocess.run(
+                    [
+                        soffice_path,
+                        '--headless',
+                        '--convert-to',
+                        'docx',
+                        '--outdir',
+                        temp_dir,
+                        str(source_path)
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                if target_path.exists():
+                    return target_path.read_bytes()
+            except Exception:
+                pass
+
+    raise ValueError(
+        "無法自動將 .doc 轉為 .docx。"
+        "Windows 請確認已安裝 Microsoft Word；"
+        "或改上傳 .docx / .txt。"
+    )
+
+
+def extract_text_from_uploaded_file(file_name, file_bytes):
+    """
+    支援 txt/doc/docx：
+    - txt: 自動編碼偵測後轉文字
+    - docx: 直接抽取純文字
+    - doc: 先轉 docx 再抽取純文字
+    """
+    suffix = Path(file_name).suffix.lower()
+
+    if suffix == '.txt':
+        return decode_text_bytes(file_bytes), None
+
+    if suffix == '.docx':
+        return extract_text_from_docx_bytes(file_bytes), "已自動由 docx 轉為純文字"
+
+    if suffix == '.doc':
+        converted_docx_bytes = convert_doc_to_docx_bytes(file_name, file_bytes)
+        return extract_text_from_docx_bytes(converted_docx_bytes), "已自動由 doc → docx → 純文字"
+
+    raise ValueError(f"不支援的檔案格式：{suffix}")
         
 def parse_transcript(text, labels):
     """
