@@ -1,6 +1,7 @@
 # 委員實質法案審查發言次/字數函式庫
 import re
 import io
+import os
 import platform
 import shutil
 import subprocess
@@ -64,6 +65,8 @@ def convert_doc_to_docx_bytes(file_name, file_bytes):
     
     on macOS: 檢查常見路徑，包括 /Applications/LibreOffice.app
     """
+    errors = []
+
     with tempfile.TemporaryDirectory() as temp_dir:
         source_path = Path(temp_dir) / file_name
         target_path = source_path.with_suffix('.docx')
@@ -71,22 +74,61 @@ def convert_doc_to_docx_bytes(file_name, file_bytes):
 
         # 方案 1: Windows + Word COM
         if platform.system().lower() == 'windows':
+            word_app = None
+            document = None
             try:
+                import pythoncom
                 import win32com.client
 
-                word_app = win32com.client.Dispatch('Word.Application')
+                pythoncom.CoInitialize()
+
+                word_app = win32com.client.DispatchEx('Word.Application')
                 word_app.Visible = False
-                document = word_app.Documents.Open(str(source_path.resolve()))
-                document.SaveAs(str(target_path.resolve()), FileFormat=16)
+                document = word_app.Documents.Open(
+                    str(source_path.resolve()),
+                    ConfirmConversions=False,
+                    ReadOnly=True,
+                    AddToRecentFiles=False,
+                )
+                document.SaveAs2(str(target_path.resolve()), FileFormat=16)
                 document.Close(False)
                 word_app.Quit()
                 return target_path.read_bytes()
-            except Exception:
-                pass
+            except Exception as e:
+                errors.append(f"Word COM 失敗: {e}")
+            finally:
+                try:
+                    if document is not None:
+                        document.Close(False)
+                except Exception:
+                    pass
+                try:
+                    if word_app is not None:
+                        word_app.Quit()
+                except Exception:
+                    pass
+                try:
+                    import pythoncom
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+        system = platform.system().lower()
+
+        windows_soffice_candidates = []
+        if system == 'windows':
+            env_candidates = [
+                Path(os.environ.get('ProgramFiles', '')) / 'LibreOffice' / 'program' / 'soffice.exe',
+                Path(os.environ.get('ProgramFiles(x86)', '')) / 'LibreOffice' / 'program' / 'soffice.exe',
+                Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'LibreOffice' / 'program' / 'soffice.exe',
+            ]
+            windows_soffice_candidates = [str(p) for p in env_candidates if str(p) != '.']
 
         # 方案 2: LibreOffice soffice (所有平台)
         soffice_candidates = [
             shutil.which('soffice'),  # PATH 中的 soffice
+            shutil.which('soffice.exe'),  # Windows PATH 中的 soffice.exe
+            *windows_soffice_candidates,
             '/Applications/LibreOffice.app/Contents/MacOS/soffice',  # macOS 標準路徑
             '/usr/bin/soffice',  # Linux 標準路徑
             '/usr/local/bin/soffice',  # Homebrew (Intel Mac)
@@ -113,15 +155,14 @@ def convert_doc_to_docx_bytes(file_name, file_bytes):
                     )
                     if target_path.exists():
                         return target_path.read_bytes()
-                except Exception:
-                    pass
+                except Exception as e:
+                    errors.append(f"LibreOffice 失敗 ({soffice_path}): {e}")
 
     # 根據平台顯示不同的錯誤訊息
-    system = platform.system().lower()
     if system == 'windows':
         error_msg = (
             "無法自動將 .doc 轉為 .docx。\n"
-            "Windows 請確認已安裝 Microsoft Word；或改上傳 .docx / .txt。"
+            "Windows 請確認已安裝 Microsoft Word（且已安裝 pywin32）或 LibreOffice；或改上傳 .docx / .txt。"
         )
     elif system == 'darwin':  # macOS
         error_msg = (
@@ -138,6 +179,9 @@ def convert_doc_to_docx_bytes(file_name, file_bytes):
             "  sudo yum install libreoffice (CentOS/RHEL)\n"
             "或改上傳 .docx / .txt。"
         )
+
+    if errors:
+        error_msg += "\n\n偵錯資訊：\n- " + "\n- ".join(errors[:5])
     
     raise ValueError(error_msg)
 

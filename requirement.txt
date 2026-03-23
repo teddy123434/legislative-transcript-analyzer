@@ -7,3 +7,4 @@ python-docx
 charset-normalizer
 flask
 werkzeug
+pywin32; platform_system == "Windows"
