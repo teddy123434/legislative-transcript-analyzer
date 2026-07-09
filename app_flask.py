@@ -3,12 +3,12 @@
 Flask 簡化版應用：當 Streamlit 不可用時的備用方案
 輕量級、依賴少、相容性好
 """
-import os
+#import os
 import sys
 import webbrowser
 import threading
 from pathlib import Path
-from werkzeug.utils import secure_filename
+#from werkzeug.utils import secure_filename
 from flask import Flask, render_template_string, request, jsonify, send_file
 import pandas as pd
 import io
@@ -165,11 +165,11 @@ HTML_TEMPLATE = """
     <div class="container">
         <h1>🏛️ 立法委員發言統計系統</h1>
         <p class="subtitle">Flask 簡化版 - 當 Streamlit 不可用時使用</p>
-        
+
         <div class="warning">
             ℹ️ 這是輕量級備用版本。完整功能請使用 Streamlit 網頁版。
         </div>
-        
+
         <form id="analysisForm">
             <div class="section">
                 <label>📋 下載範本名單</label>
@@ -222,36 +222,36 @@ HTML_TEMPLATE = """
 
         document.getElementById('analysisForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const labelFile = document.getElementById('labelFile').files[0];
             const transcriptFile = document.getElementById('transcriptFile').files[0];
-            
+
             if (!labelFile || !transcriptFile) {
                 alert('請選擇所有檔案');
                 return;
             }
-            
+
             const formData = new FormData();
             formData.append('label_file', labelFile);
             formData.append('transcript_file', transcriptFile);
-            
+
             document.getElementById('progress').style.display = 'block';
             document.getElementById('error').style.display = 'none';
             document.getElementById('result').style.display = 'none';
-            
+
             try {
                 const response = await fetch('/analyze', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (!response.ok) {
                     const error = await response.json();
                     throw new Error(error.error || '分析失敗');
                 }
-                
+
                 resultData = await response.json();
-                
+
                 document.getElementById('resultText').innerHTML = `
                     會議名稱：${resultData.meeting_info.name}<br>
                     會議日期：${resultData.meeting_info.date}<br>
@@ -259,7 +259,7 @@ HTML_TEMPLATE = """
                     <br>
                     分析完成！請下載 Excel 報表查看詳細統計。
                 `;
-                
+
                 document.getElementById('progress').style.display = 'none';
                 document.getElementById('result').style.display = 'block';
             } catch (err) {
@@ -271,7 +271,7 @@ HTML_TEMPLATE = """
 
         function downloadResult() {
             if (!resultData) return;
-            
+
             const link = document.createElement('a');
             link.href = '/download-result';
             link.download = 'legislator_stats.xlsx';
@@ -302,11 +302,11 @@ def download_template():
         '黨籍': ['民進黨', '國民黨', '民眾黨', '無黨籍'],
         '姓名': ['張宏陸', '牛煦庭', '張啓楷', '陳超明']
     })
-    
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         template_df.to_excel(writer, sheet_name='委員名單', index=False)
-    
+
     output.seek(0)
     return send_file(
         output,
@@ -320,42 +320,42 @@ def download_template():
 def analyze():
     """分析逐字稿"""
     global analysis_result
-    
+
     try:
         # 取得上傳的檔案
         label_file = request.files.get('label_file')
         transcript_file = request.files.get('transcript_file')
-        
+
         if not label_file or not transcript_file:
             return jsonify({'error': '須上傳名單和逐字稿'}), 400
-        
+
         # 讀取名單
         df_config = pd.read_excel(label_file)
-        
+
         # 欄位標準化
         rename_map = {}
         if '黨籍' in df_config.columns and '政黨' not in df_config.columns:
             rename_map['黨籍'] = '政黨'
         if rename_map:
             df_config = df_config.rename(columns=rename_map)
-        
+
         required_columns = {'姓名', '政黨'}
         if not required_columns.issubset(df_config.columns):
             return jsonify({'error': "名單格式需包含『姓名』與『政黨』欄位"}), 400
-        
+
         # 清理資料
         df_config = df_config.dropna(subset=['姓名', '政黨']).copy()
         df_config['姓名'] = df_config['姓名'].astype(str).str.strip()
         df_config['政黨'] = df_config['政黨'].astype(str).str.strip()
-        
+
         # 讀取逐字稿
         transcript_bytes = transcript_file.read()
         text, convert_note = extract_text_from_uploaded_file(transcript_file.filename, transcript_bytes)
-        
+
         # 解析
         labels = dict(zip(df_config['姓名'], df_config['政黨']))
         info, stats = parse_transcript(text, labels)
-        
+
         # 生成結果 DataFrame
         row_data = {
             ("基本資訊", "日期", ""): info['date'],
@@ -365,14 +365,14 @@ def analyze():
         for name, party in labels.items():
             row_data[(party, name, "次數")] = stats.get(name, {}).get('count', 0)
             row_data[(party, name, "字數")] = stats.get(name, {}).get('words', 0)
-        
+
         # 創建 DataFrame
         df = pd.DataFrame([row_data])
         df.columns = pd.MultiIndex.from_tuples(df.columns)
-        
+
         # 重新排序
         name_index_map = {name: i for i, name in enumerate(labels.keys())}
-        
+
         def list_based_sort_key(col_tuple):
             category, name, metric = col_tuple
             if category == "基本資訊":
@@ -382,19 +382,19 @@ def analyze():
             idx = name_index_map.get(name, 9999)
             m_rank = 0 if metric == "次數" else 1
             return (0, idx, m_rank)
-        
+
         sorted_cols = sorted(df.columns, key=list_based_sort_key)
         df = df[sorted_cols]
-        
+
         # 存儲結果用於下載
         analysis_result = df
-        
+
         return jsonify({
             'success': True,
             'meeting_info': info,
             'stats': {name: stats[name]['count'] for name in labels}
         })
-    
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -404,11 +404,11 @@ def download_result():
     """下載分析結果"""
     if analysis_result is None:
         return jsonify({'error': '無可用的分析結果'}), 400
-    
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         analysis_result.to_excel(writer, sheet_name='統計結果')
-    
+
     output.seek(0)
     return send_file(
         output,
@@ -429,14 +429,14 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🏛️  立法委員會議發言統計系統 - Flask 簡化版")
     print("=" * 60)
-    print("\n🚀 正在啟動...") 
+    print("\n🚀 正在啟動...")
     print("   網址：http://127.0.0.1:5000")
     print("\n💡 按 Ctrl+C 停止程式")
     print("=" * 60)
-    
+
     # 在後台執行緒打開瀏覽器
     browser_thread = threading.Thread(target=open_browser, daemon=True)
     browser_thread.start()
-    
+
     # 啟動 Flask
     app.run(debug=False, port=5000)

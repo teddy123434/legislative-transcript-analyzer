@@ -26,16 +26,33 @@ PYTHON_VERSION=$(python3 --version 2>&1)
 echo "✅ 偵測到 Python：$PYTHON_VERSION"
 echo ""
 
-# 安裝依賴
-echo "⚙️  正在安裝所需套件..."
-python3 -m pip install -r requirement.txt
+# --- [修正開始] 自動使用虛擬環境安裝依賴 ---
+VENV_DIR="./venv"
+if [ ! -d "$VENV_DIR" ]; then
+    echo "⚙️  正在創建虛擬環境..."
+    python3 -m venv "$VENV_DIR"
+fi
+
+# 啟用虛擬環境並安裝依賴
+echo "⚙️  正在使用虛擬環境安裝所需套件..."
+source "$VENV_DIR/bin/activate"
+if [ $? -ne 0 ]; then
+    echo "❌ 套件安裝失敗 (Virtual Environment setup failed)"
+    deactivate
+    exit 1
+fi
+
+# 使用虛擬環境安裝依賴
+pip install -r requirement.txt
 if [ $? -ne 0 ]; then
     echo "❌ 套件安裝失敗"
+    deactivate
     exit 1
 fi
 echo "✅ 套件安裝完成"
-echo ""
+deactivate
+# --- [修正結束] ---
 
-# 啟動 Streamlit
+# 啟動 Streamlit 應用 (明確使用虛擬環境內的 python)
 echo "🚀 啟動 Streamlit 應用..."
-python3 -m streamlit run app.py
+"$VENV_DIR/bin/python" -m streamlit run app.py

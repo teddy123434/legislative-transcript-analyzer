@@ -6,7 +6,7 @@
 """
 import sys
 import subprocess
-import os
+#import os
 from pathlib import Path
 
 
@@ -22,13 +22,13 @@ def check_python_version():
 def install_requirements():
     """自動安裝 requirement.txt 中的所有套件"""
     requirements_file = Path(__file__).parent / "requirement.txt"
-    
+
     if not requirements_file.exists():
         print(f"❌ 找不到 requirement.txt：{requirements_file}")
         sys.exit(1)
-    
+
     print("\n📦 正在安裝所需套件...")
-    
+
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)],
@@ -47,13 +47,13 @@ def install_requirements():
 def launch_streamlit():
     """嘗試啟動 Streamlit 應用"""
     app_file = Path(__file__).parent / "app.py"
-    
+
     if not app_file.exists():
         return False
-    
+
     print("\n🚀 嘗試啟動 Streamlit 應用...")
     print(f"   應用檔案：{app_file}")
-    
+
     try:
         result = subprocess.run(
             [sys.executable, "-m", "streamlit", "run", str(app_file)],
@@ -65,20 +65,20 @@ def launch_streamlit():
             return True
     except Exception as e:
         print(f"   ⚠️  Streamlit 啟動失敗：{e}")
-    
+
     return False
 
 
 def launch_flask():
     """降級方案 1：啟動 Flask 簡化版應用"""
     app_file = Path(__file__).parent / "app_flask.py"
-    
+
     if not app_file.exists():
         return False
-    
+
     print("\n🔄 Streamlit 不可用，改用 Flask 簡化版...")
     print("   應用檔案：app_flask.py")
-    
+
     try:
         subprocess.run(
             [sys.executable, str(app_file)],
@@ -87,17 +87,17 @@ def launch_flask():
         return True
     except Exception as e:
         print(f"   ⚠️  Flask 啟動失敗：{e}")
-    
+
     return False
 
 
 def suggest_offline_tool():
     """降級方案 2：建議使用命令行工具"""
     offline_file = Path(__file__).parent / "analyze_offline.py"
-    
+
     if not offline_file.exists():
         return False
-    
+
     print("\n" + "=" * 60)
     print("⚠️  網頁版本無法啟動")
     print("=" * 60)
@@ -107,7 +107,7 @@ def suggest_offline_tool():
     print(f"  python {offline_file.name}")
     print("\n詳見：README.md")
     print("=" * 60)
-    
+
     return True
 
 
@@ -115,27 +115,27 @@ if __name__ == "__main__":
     print("=" * 60)
     print("🏛️  立法委員發言自動統計系統 - 啟動程序")
     print("=" * 60)
-    
+
     # 步驟 1：檢查 Python 版本
     print("\n⚙️  檢查環境...")
     check_python_version()
-    
+
     # 步驟 2：安裝依賴
     install_requirements()
-    
+
     # 步驟 3：嘗試啟動應用（三層降級）
     print("\n" + "=" * 60)
     print("🎯 啟動應用")
     print("=" * 60)
-    
+
     # 第一層：Streamlit（最佳體驗）
     if launch_streamlit():
         sys.exit(0)
-    
+
     # 第二層：Flask（輕量級降級）
     if launch_flask():
         sys.exit(0)
-    
+
     # 第三層：建議使用命令行工具
     suggest_offline_tool()
     sys.exit(1)

@@ -5,6 +5,6 @@ numpy
 xlsxwriter
 python-docx
 charset-normalizer
-flask
+flask>=2.0,<3.0
 werkzeug
 pywin32; platform_system == "Windows"
