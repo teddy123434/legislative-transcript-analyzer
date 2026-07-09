@@ -77,18 +77,19 @@ if label_file and uploaded_files:
             df_config['委員會'] = df_config['委員會'].fillna('').astype(str).str.strip()
 
         # 可選擇委員會過濾
-        committees = [c for c in df_config['委員會'].unique().tolist() if c]
-        if committees:
-            selected_committees = st.sidebar.multiselect(
-                "3. 篩選委員會（可複選）",
-                options=committees,
-                default=committees,
-                on_change=clear_cache
-            )
-            if selected_committees:
-                df_config = df_config[df_config['委員會'].isin(selected_committees)]
-            else:
-                df_config = pd.DataFrame() # 設置為空 DataFrame
+        if '委員會' in df_config.columns:
+            committees = [c for c in df_config['委員會'].unique().tolist() if c]
+            if committees:
+                selected_committees = st.sidebar.multiselect(
+                    "3. 篩選委員會（可複選）",
+                    options=committees,
+                    default=committees,
+                    on_change=clear_cache
+                )
+                if selected_committees:
+                    df_config = df_config[df_config['委員會'].isin(selected_committees)]
+                else:
+                    df_config = pd.DataFrame() # 設置為空 DataFrame
 
         labels = dict(zip(df_config['姓名'], df_config['政黨']))
 
